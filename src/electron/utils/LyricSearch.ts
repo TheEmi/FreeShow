@@ -10,13 +10,14 @@ export type LyricSearchResult = {
 
 export class LyricSearch {
     static search = async (artist: string, title: string) => {
-        const results = await Promise.all([LyricSearch.searchGenius(artist, title), LyricSearch.searchHymnary(title)])
+        const results = await Promise.all([LyricSearch.searchGenius(artist, title), LyricSearch.searchHymnary(title),LyricSearch.searchResurse(title)])
         return results.flat()
     }
 
     static get(song: LyricSearchResult) {
         if (song.source === "Genius") return LyricSearch.getGenius(song)
         else if (song.source === "Hymnary") return LyricSearch.getHymnary(song)
+        else if (song.source === "Resurse Crestine") return LyricSearch.getResurse(song)
         return Promise.resolve("")
     }
 
@@ -141,4 +142,63 @@ export class LyricSearch {
         }
         return arrData
     }
+
+     //RESURSE CRESTINE
+     private static searchResurse = async (title: string) => {
+        try {
+            const url = `http://www.resursecrestine.ro/web-api-search?search_text=${encodeURIComponent(title)}&search_in=2&search_by=filtru-titlu&output=json`
+            const response = await axios.get(url)
+            const body = await response.data
+            const match = body.match(/"Results":(\[.*?\])/);
+            if (match) {
+                const results = JSON.parse(match[1]);
+                const songs = results
+                if (songs.length > 0) songs.splice(0, 1)
+                    for (let i = songs.length - 1; i >= 0; i--) if (songs[i].length < 7) songs.splice(i, 1)
+                if (songs.length > 3) songs.splice(3, songs.length - 3)
+                    return songs.map((s: any) => LyricSearch.convertResurseToResult(s, title))
+            }
+        } catch (ex) {
+            console.log(ex)
+            return []
+        }
+    }
+
+    private static getResurse = async (song: LyricSearchResult) => {
+        const url = `https://www.resursecrestine.ro/cantece/${song.key}`
+        const response = await axios.get(url)
+        const html = await response.data
+        const regex = /<div class=\"resized-text\">(.*?)<\/div>/gs
+        const match = regex.exec(html)
+
+        let result = ""
+        if (match) {
+            result = match[0]
+            result = result.replace(/<br\s*\/?>/gi, "\n")
+            result = result.replaceAll("\n\n", "\n").replaceAll("\n\r\n", "\n")
+            result = result.replaceAll("</p>", "\n\n")
+            result = result.replaceAll("\n\n\n", "\n\n").replaceAll("\n\r\n\n", "\n\n")
+            result = result.replace(/<[^>]*>?/gm, "")
+
+            const lines = result.split("\n")
+            const newLines: any[] = []
+            lines.forEach((line) => {
+                let contents = line.replace(/^\d+\s+/gm, "").trim() //remove leading numbers
+                newLines.push(contents)
+            })
+            result = newLines.join("\n").trim()
+        }
+        return result
+    }
+
+    private static convertResurseToResult = (resurseResult: any, originalQuery: string) => {
+        return {
+            source: "Resurse Crestine",
+            key: resurseResult.id + "/" + resurseResult.title_slug,
+            artist: resurseResult.author,
+            title: resurseResult.title,
+            originalQuery: originalQuery,
+        } as LyricSearchResult
+    }
+
 }
