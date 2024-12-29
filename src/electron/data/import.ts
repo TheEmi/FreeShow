@@ -1,5 +1,7 @@
 import path, { join } from "path"
 import PPTX2Json from "pptx2json"
+//@ts-ignore
+import PPT from "ppt2text"
 import protobufjs from "protobufjs"
 import SqliteToJson from "sqlite-to-json"
 import sqlite3 from "sqlite3"
@@ -16,8 +18,22 @@ const specialImports: any = {
         // https://www.npmjs.com/package/pptx2json
         const pptx2json = new PPTX2Json()
         for await (const filePath of files) {
-            const json = await pptx2json.toJson(filePath)
-            data.push({ name: getFileName(filePath), content: json })
+            const extension = filePath.split('.').pop()?.toLowerCase();
+
+        if (extension === 'pptx') {
+            // Process .pptx files
+            // https://www.npmjs.com/package/pptx2json
+            const json = await pptx2json.toJson(filePath);
+            data.push({ name: getFileName(filePath), content: json, extension: 'pptx' });
+        } else if (extension === 'ppt') {
+            // Handle .ppt files with https://www.npmjs.com/package/ppt2text
+            let w = PPT.readFile(filePath, {});
+            const text = PPT.to_text(w);
+            data.push({ name: getFileName(filePath), content: text, extension: 'ppt' });
+        } else {
+            // Skip unsupported files or log a warning
+            console.warn(`Unsupported file type: ${filePath}`);
+        }
         }
 
         return data

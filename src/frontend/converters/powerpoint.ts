@@ -15,13 +15,18 @@ export function convertPowerpoint(files: any[]) {
     let tempShows: any[] = []
 
     setTimeout(() => {
-        files.forEach(({ name, content }: any) => {
-            // sort by name to ensure correct slide order (ppt/slides/slide1.xml)
-            const slideKeys = Object.keys(content)
-                .filter((a) => a.includes("ppt/slides/slide"))
-                .sort((a, b) => a.localeCompare(b))
+        files.forEach(({ name, content, extension }: any) => {
+            let slides: string[][][] = []
+            if (extension === "ppt") {
+                slides = content.map((slide) => convertPPT(slide))
+            } else if (extension === "pptx") {
+                // sort by name to ensure correct slide order (ppt/slides/slide1.xml)
+                const slideKeys = Object.keys(content)
+                    .filter((a) => a.includes("ppt/slides/slide"))
+                    .sort((a, b) => a.localeCompare(b))
 
-            let slides: string[][][] = slideKeys.map((key) => convertPPTX(content[key]))
+                slides = slideKeys.map((key) => convertPPTX(content[key]))
+            }
             if (!slides.length) {
                 alertMessage.set('This format is unsupported, try using an online "PPT to TXT converter".')
                 return
@@ -54,6 +59,17 @@ export function convertPowerpoint(files: any[]) {
 
         setTempShows(tempShows)
     }, 10)
+}
+
+function convertPPT(content: any) {
+    let slide: string[][] = []
+    //Map text \n to new line and separate slides.
+    let lines: string[] = []
+    content.split("\n").forEach((line: string) => {
+        lines.push(line)
+    })
+    slide.push(lines)
+    return slide
 }
 
 function convertPPTX(content: any) {
